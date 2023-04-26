@@ -25,7 +25,7 @@ app.layout = html.Div(
         ),
         html.Div(
             html.Button(
-                "Convert", id="get-info-button", style={"pointer-events": "auto"}
+                "Convert", id="get-info-button", style={"pointerEvents": "auto"}
             ),
             id="floating-square",
             style={
@@ -33,10 +33,10 @@ app.layout = html.Div(
                 "height": "640px",
                 "width": "640px",
                 "position": "absolute",
-                "top": "50%",
+                "top": "80px",
                 "left": "50%",
-                "transform": "translate(-50%, -50%)",
-                "pointer-events": "none",
+                "transform": "translate(-50%, 0)",
+                "pointerEvents": "none",
             },
         ),
         html.Img(id="result"),
