@@ -61,11 +61,28 @@ app.clientside_callback(
         document.head.appendChild(script);
 
         var map;
+        let markers = [];
+
+        function addMarker(latLng) {{
+            let marker = new google.maps.Marker({{
+                map: map,
+                position: latLng,
+                draggable: true,
+                icon: 'https://developers.google.com/maps/documentation/javascript/examples/full/images/beachflag.png'
+            }});
+            markers.push(marker);
+            console.log(latLng.lat(), latLng.lng());
+        }}
 
         function createMap() {{
             map = new google.maps.Map(document.getElementById('map'), {{
                 center: {{ lat: {default_location["lat"]}, lng: {default_location["lon"]} }},
                 zoom: {default_location["zoom"]}
+            }});
+
+            map.addListener('click', function(e) {{
+                console.log(e);
+                addMarker(e.latLng);
             }});
         }}
 
@@ -155,19 +172,58 @@ def extract_water_edge(
     return rgba
 
 
+
+import math
+
+def lat_lng_to_pixels(lat, lng, zoom):
+    TILE_SIZE = 256
+    scale = 2 ** zoom
+    x = (lng + 180) / 360 * scale * TILE_SIZE
+    y = (1 - math.log(math.tan(math.radians(lat)) + 1 / math.cos(math.radians(lat))) / math.pi) / 2 * scale * TILE_SIZE
+    return x, y
+
+def pixels_to_lat_lng(x, y, zoom):
+    TILE_SIZE = 256
+    scale = 2 ** zoom
+    lng = x / (scale * TILE_SIZE) * 360 - 180
+    lat = math.degrees(math.atan(math.sinh(math.pi * (1 - 2 * y / (scale * TILE_SIZE)))))
+    return lat, lng
+
+def calculate_bounds(center_lat, center_lng, zoom, img_width=640, img_height=640):
+    x, y = lat_lng_to_pixels(center_lat, center_lng, zoom)
+
+    top_left_x = x - img_width / 2
+    top_left_y = y - img_height / 2
+    bottom_right_x = x + img_width / 2
+    bottom_right_y = y + img_height / 2
+
+    top_left_lat, top_left_lng = pixels_to_lat_lng(top_left_x, top_left_y, zoom)
+    bottom_right_lat, bottom_right_lng = pixels_to_lat_lng(bottom_right_x, bottom_right_y, zoom)
+
+    return top_left_lat, top_left_lng, bottom_right_lat, bottom_right_lng
+
+
+
 @app.callback(Output("result", "src"), Input("map-data", "data"))
 def generate_map(map_data):
     if not map_data:
         raise PreventUpdate
 
+    bounds = calculate_bounds(map_data["lat"], map_data["lon"], map_data["zoom"])
+                 
     img = download_google_maps_image(
         map_data["lat"], map_data["lon"], map_data["zoom"], (640, 640), api_key
     )
 
     img = extract_water_edge(img)
 
+    compression_level = 9
+    cv2.imwrite('output.png', img, [cv2.IMWRITE_PNG_COMPRESSION, compression_level])
+
+    print(map_data["zoom"], *map(math.radians, bounds))
+
     # Convert the image to a base64-encoded PNG using OpenCV
-    retval, buffer = cv2.imencode(".png", img)
+    _, buffer = cv2.imencode(".png", img)
     img_str = base64.b64encode(buffer).decode("utf-8")
 
     # Return the base64-encoded image data
